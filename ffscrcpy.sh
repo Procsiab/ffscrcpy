@@ -90,16 +90,18 @@ _IS_SCREEN_ON=0
 _IS_SKIP_CHECKS=0
 _IS_LETTERBOXED=0
 _IS_WIRELESS_ADB=0
+_IS_CROPPED=1
 LB_CUSTOM_SIZE=""
-while getopts ":hoslwv" OPT
+while getopts ":hoslwvC" OPT
 do
     case $OPT in
         h)
-            echo "[HELP] Usage: android-cam [-s] [-m] [-l <DIMENSIONS>] [-v LEVEL]"
+            echo "[HELP] Usage: android-cam [-s] [-m] [-l <DIMENSIONS>] [-C] [-v LEVEL]"
             echo "[HELP]    -o: Keep phone screen on"
             echo "[HELP]    -s: Skip startup checks"
             echo "[HELP]    -l: Letterbox with phone screen dimensions
 [HELP]        or specific ones, in the form of WxH in pixels"
+            echo "[HELP]    -C: Do not crop the canvas to hide the OpenCamera UI"
             echo "[HELP]    -w: Enable wireless streaming (the device must be connected first)"
             echo "[HELP]    -v: Choose verbosity level between 0 and 3"
             exit 0
@@ -118,6 +120,9 @@ do
                 LB_CUSTOM_SIZE=$_ARGUMENT
                 shift
             fi
+            ;;
+        C)
+            _IS_CROPPED=0
             ;;
         w)
             _IS_WIRELESS_ADB=1
@@ -227,20 +232,39 @@ OC_UI_WIDTH=240
 # Capture the Android smartphone screen, crop it and send it to the socket 127.0.0.1:10080
 if [[ $_IS_SCREEN_ON -eq 0 ]]
 then
-    scrcpy $SCRCPY_DEVICE_IP\
-        --max-fps 30 \
-        --turn-screen-off \
-        --crop $SCR_WIDTH:$(($SCR_HEIGHT - $(($OC_UI_WIDTH * 2)))):0:240 \
-        --no-display \
-        --serve tcp:localhost:10080 \
-        > /dev/null 2>&1 &
+    if [[ $_IS_CROPPED -eq 1 ]]
+    then
+        scrcpy $SCRCPY_DEVICE_IP\
+            --max-fps 30 \
+            --turn-screen-off \
+            --crop $SCR_WIDTH:$(($SCR_HEIGHT - $(($OC_UI_WIDTH * 2)))):0:240 \
+            --no-display \
+            --serve tcp:localhost:10080 \
+            > /dev/null 2>&1 &
+    else
+        scrcpy $SCRCPY_DEVICE_IP\
+            --max-fps 30 \
+            --turn-screen-off \
+            --no-display \
+            --serve tcp:localhost:10080 \
+            > /dev/null 2>&1 &
+    fi
 else
+    if [[ $_IS_CROPPED -eq 1 ]]
+    then
     scrcpy $SCRCPY_DEVICE_IP\
         --max-fps 30 \
         --crop $SCR_WIDTH:$(($SCR_HEIGHT - $(($OC_UI_WIDTH * 2)))):0:240 \
         --no-display \
         --serve tcp:localhost:10080 \
         > /dev/null 2>&1 &
+    else
+    scrcpy $SCRCPY_DEVICE_IP\
+        --max-fps 30 \
+        --no-display \
+        --serve tcp:localhost:10080 \
+        > /dev/null 2>&1 &
+    fi
 fi
 _console_log 2 "scrcpy is capturing the screen, streaming it to localhost:10080"
 
