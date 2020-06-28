@@ -215,11 +215,33 @@ fi
 
 if [[ $_IS_SCREEN_ON -eq 0 ]]
 then
-    # Unlock phone, turn off screen and let the user open the camera app
-    _console_log 1 "unlock your device and open the camera app; then close the scrcpy window"
-    scrcpy $SCRCPY_DEVICE_IP\
-        --turn-screen-off \
-        > /dev/null 2>&1
+    # Check if the screen is locked
+    if [[ $(adb shell dumpsys power | grep -o -e 'mHoldingWakeLockSuspendBlocker=false' -e 'mHoldingDisplaySuspendBlocker=false' | wc -l) -eq 2 ]]
+    then
+        # In case the screen is locked, open a scrcpy window and ask the user to unlock and launch the camera
+        _console_log 1 "unlock your device and open the camera app; then close the scrcpy window"
+        scrcpy $SCRCPY_DEVICE_IP\
+            --turn-screen-off \
+            > /dev/null 2>&1
+    else
+        # If the screen is unlocked, run directly scrcpy with turn off display flag and stop it
+        _console_log 2 "turning screen off during the streaming"
+        scrcpy $SCRCPY_DEVICE_IP\
+            --turn-screen-off \
+            > /dev/null 2>&1 &
+        _PID_SCRCPY_OFF_SCREEN=$!
+        sleep 1.5
+        kill $_PID_SCRCPY_OFF_SCREEN
+    fi
+    # If the screen is unlocked, try to launch the OpenCamera app if it exists
+    if [[ $(adb shell pm list packages -3 | grep -o net.sourceforge.opencamera) ]]
+    then
+        adb shell am start -n net.sourceforge.opencamera/net.sourceforge.opencamera.MainActivity > /dev/null 2>&1
+        _console_log 2 "launched the OpenCamera app automatically"
+    else
+        # If OpenCamera is not installed, inform the user
+        _console_log 1 "OpenCamera app was not found: the current screen will be captured"
+    fi
 fi
 
 # Obtain screen size from ADB shell
