@@ -256,6 +256,7 @@ if [[ $_IS_SCREEN_ON -eq 0 ]]
 then
     if [[ $_IS_CROPPED -eq 1 ]]
     then
+        # Screen off and cropping enabled
         scrcpy $SCRCPY_DEVICE_IP\
             --max-fps 30 \
             --turn-screen-off \
@@ -264,6 +265,7 @@ then
             --serve tcp:localhost:10080 \
             > /dev/null 2>&1 &
     else
+        # Screen off and cropping disabled
         scrcpy $SCRCPY_DEVICE_IP\
             --max-fps 30 \
             --turn-screen-off \
@@ -274,18 +276,20 @@ then
 else
     if [[ $_IS_CROPPED -eq 1 ]]
     then
-    scrcpy $SCRCPY_DEVICE_IP\
-        --max-fps 30 \
-        --crop $SCR_WIDTH:$(($SCR_HEIGHT - $(($OC_UI_WIDTH * 2)))):0:240 \
-        --no-display \
-        --serve tcp:localhost:10080 \
-        > /dev/null 2>&1 &
+        # Screen on and cropping enabled
+        scrcpy $SCRCPY_DEVICE_IP\
+            --max-fps 30 \
+            --crop $SCR_WIDTH:$(($SCR_HEIGHT - $(($OC_UI_WIDTH * 2)))):0:240 \
+            --no-display \
+            --serve tcp:localhost:10080 \
+            > /dev/null 2>&1 &
     else
-    scrcpy $SCRCPY_DEVICE_IP\
-        --max-fps 30 \
-        --no-display \
-        --serve tcp:localhost:10080 \
-        > /dev/null 2>&1 &
+        # Screen on and cropping disabled
+        scrcpy $SCRCPY_DEVICE_IP\
+            --max-fps 30 \
+            --no-display \
+            --serve tcp:localhost:10080 \
+            > /dev/null 2>&1 &
     fi
 fi
 _console_log 2 "scrcpy is capturing the screen, streaming it to localhost:10080"
