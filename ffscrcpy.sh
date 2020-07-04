@@ -11,7 +11,7 @@
 # - there will be only one android device connected
 # - the user who runs the script has access without root to its Android device ADB session
 # - the smartphone will run the OpenCamera app
-# - the socket 127.0.0.1:10080 is bindable
+# - the sockets on localhost from port 10080 to 10089 are bindable
 
 
 # Print message based on verbosity level (default 1)
@@ -91,17 +91,23 @@ _IS_SKIP_CHECKS=0
 _IS_LETTERBOXED=0
 _IS_WIRELESS_ADB=0
 _IS_CROPPED=1
+DEVICE_NUMBER=0
+DEVICE_SERIAL=0000000
+DEVICE_STREAM=""
 LB_CUSTOM_SIZE=""
-while getopts ":hoslwvC" OPT
+while getopts ":hoslwvCn" OPT
 do
     case $OPT in
         h)
-            echo "[HELP] Usage: android-cam [-s] [-m] [-l <DIMENSIONS>] [-C] [-v LEVEL]"
+            echo "[HELP] Usage: android-cam [-s] [-m] [-l <DIMENSIONS>] [-C] [-n SERIAL:NUMBER] [-w] [-v LEVEL]"
             echo "[HELP]    -o: Keep phone screen on"
             echo "[HELP]    -s: Skip startup checks"
             echo "[HELP]    -l: Letterbox with phone screen dimensions
 [HELP]        or specific ones, in the form of WxH in pixels"
             echo "[HELP]    -C: Do not crop the canvas to hide the OpenCamera UI"
+            echo "[HELP]    -n: Choose the number to assign to the /dev/video device
+[HELP]        (defaults to 2) and the serial of the Android device
+[HELP]        (defaults to the first recognized device from ADB)"
             echo "[HELP]    -w: Enable wireless streaming (the device must be connected first)"
             echo "[HELP]    -v: Choose verbosity level between 0 and 3"
             exit 0
@@ -119,10 +125,24 @@ do
             then
                 LB_CUSTOM_SIZE=$_ARGUMENT
                 shift
+            else
+                _console_log 0 "invalid letterboxing dimensions: use two integers separated by an 'x' (lowercase)"
+                exit 1
             fi
             ;;
         C)
             _IS_CROPPED=0
+            ;;
+        n)
+            read _ARGUMENT _DISCARD <<<"${@:$OPTIND}"
+            if [[ $_ARGUMENT =~ ^[0-9a-f]+:[0-9]$ ]]
+            then
+                DEVICE_STREAM=$_ARGUMENT
+                shift
+            else
+                _console_log 0 "invalid device association: provide the serial number and the video device number, separated by a ':' (colon)"
+                exit 1
+            fi
             ;;
         w)
             _IS_WIRELESS_ADB=1
@@ -135,6 +155,7 @@ do
                 shift
             else
                 _console_log 0 "invalid verbosity level: use an integer between 0 and 3"
+                exit 1
             fi
             ;;
         \?)
@@ -147,27 +168,38 @@ done
 # Ensure that no other scrcpy processes are already running
 _killall_scrcpy
 
+# Start ADB server
+if [[ $(adb get-state > /dev/null 2>&1; echo $?) -eq 0 ]]
+then
+    _console_log 2 "ADB server connected"
+elif [[ $(adb get-state > /dev/null 2>&1; echo $?) -eq 1 ]]
+then
+    _console_log 0 "no Android device was detected: ensure you have connected it and you run this program with the correct permissions"
+    exit 1
+fi
+
+# Check if a custom device streaming association was provided
+if [[ -n $DEVICE_STREAM ]]
+then
+    DEVICE_SERIAL=$(echo $DEVICE_STREAM | cut -d ':' -f 1)
+    DEVICE_NUMBER=$(echo $DEVICE_STREAM | cut -d ':' -f 2)
+else
+    DEVICE_SERIAL=$(adb devices | tail -n+2 | head -n1 | grep -oE "^[0-9a-f]+")
+    DEVICE_NUMBER=2
+fi
+_console_log 2 "this script will stream the screen from Android device $DEVICE_SERIAL to the loopback device /dev/video$DEVICE_NUMBER"
+
 # Startup checks, perform if not skipped
 if [[ $_IS_SKIP_CHECKS -eq 0 ]]
 then
     # Load video loopback kernel module, under /dev/video2
     if [[ $(lsmod | grep v4l2loopback | wc -l) -gt 0 ]]
     then
-        _console_log 2 "module already loaded"
+        _console_log 2 "module already loaded, no new video device will be created"
     else
         _console_log 1 "requesting module loading: grant root permissions"
-        sudo modprobe v4l2loopback video_nr=2 card_label="Android Camera"
-        _console_log 2 "loaded /dev/video2 device with name \"Android Camera\""
-    fi
-
-    # Start ADB server
-    if [[ $(adb get-state > /dev/null 2>&1; echo $?) -eq 0 ]]
-    then
-        _console_log 2 "ADB server connected"
-    elif [[ $(adb get-state > /dev/null 2>&1; echo $?) -eq 1 ]]
-    then
-        _console_log 0 "no Android device was detected: ensure you have connected it and you run this program with the correct permissions"
-        exit 1
+        sudo modprobe v4l2loopback video_nr="$DEVICE_NUMBER" card_label="Android Camera"
+        _console_log 2 "loaded /dev/video$DEVICE_NUMBER device with name \"Android Camera\""
     fi
 
     # Check battery level above 30%
@@ -221,12 +253,14 @@ then
         # In case the screen is locked, open a scrcpy window and ask the user to unlock and launch the camera
         _console_log 1 "unlock your device and open the camera app; then close the scrcpy window"
         scrcpy $SCRCPY_DEVICE_IP\
+            --serial $DEVICE_SERIAL \
             --turn-screen-off \
             > /dev/null 2>&1
     else
         # If the screen is unlocked, run directly scrcpy with turn off display flag and stop it
         _console_log 2 "turning screen off during the streaming"
         scrcpy $SCRCPY_DEVICE_IP\
+            --serial $DEVICE_SERIAL \
             --turn-screen-off \
             > /dev/null 2>&1 &
         _PID_SCRCPY_OFF_SCREEN=$!
@@ -251,26 +285,29 @@ SCR_HEIGHT=$(echo $SCR_SIZE | cut -d 'x' -f 2)
 
 # Crop the OpenCamera UI
 OC_UI_WIDTH=240
-# Capture the Android smartphone screen, crop it and send it to the socket 127.0.0.1:10080
+# Capture the Android smartphone screen, crop it and send it to the socket 127.0.0.1:10080+DEVICE_NUMBER
+_LOCAL_STREAMING_PORT=$((10080 + $DEVICE_NUMBER))
 if [[ $_IS_SCREEN_ON -eq 0 ]]
 then
     if [[ $_IS_CROPPED -eq 1 ]]
     then
         # Screen off and cropping enabled
         scrcpy $SCRCPY_DEVICE_IP\
+            --serial $DEVICE_SERIAL \
             --max-fps 30 \
             --turn-screen-off \
             --crop $SCR_WIDTH:$(($SCR_HEIGHT - $(($OC_UI_WIDTH * 2)))):0:240 \
             --no-display \
-            --serve tcp:localhost:10080 \
+            --serve tcp:localhost:$_LOCAL_STREAMING_PORT \
             > /dev/null 2>&1 &
     else
         # Screen off and cropping disabled
         scrcpy $SCRCPY_DEVICE_IP\
+            --serial $DEVICE_SERIAL \
             --max-fps 30 \
             --turn-screen-off \
             --no-display \
-            --serve tcp:localhost:10080 \
+            --serve tcp:localhost:$_LOCAL_STREAMING_PORT \
             > /dev/null 2>&1 &
     fi
 else
@@ -278,27 +315,29 @@ else
     then
         # Screen on and cropping enabled
         scrcpy $SCRCPY_DEVICE_IP\
+            --serial $DEVICE_SERIAL \
             --max-fps 30 \
             --crop $SCR_WIDTH:$(($SCR_HEIGHT - $(($OC_UI_WIDTH * 2)))):0:240 \
             --no-display \
-            --serve tcp:localhost:10080 \
+            --serve tcp:localhost:$_LOCAL_STREAMING_PORT \
             > /dev/null 2>&1 &
     else
         # Screen on and cropping disabled
         scrcpy $SCRCPY_DEVICE_IP\
+            --serial $DEVICE_SERIAL \
             --max-fps 30 \
             --no-display \
-            --serve tcp:localhost:10080 \
+            --serve tcp:localhost:$_LOCAL_STREAMING_PORT \
             > /dev/null 2>&1 &
     fi
 fi
-_console_log 2 "scrcpy is capturing the screen, streaming it to localhost:10080"
+_console_log 2 "scrcpy is capturing the screen, streaming it to localhost:$_LOCAL_STREAMING_PORT"
 
 # Wait for the capture to begin
 sleep 1
 
 # Inform the user on how to quit ffmpeg (once done the scrcpy server will automatically shutdown)
-_console_log 2 "streaming with ffmpeg from local socket to /dev/video2 device"
+_console_log 2 "streaming with ffmpeg from local socket to /dev/video$DEVICE_NUMBER device"
 _console_log 2 "press 'q' to terminate the streaming"
 
 # Manage video stream letterboxing
@@ -320,23 +359,23 @@ then
     fi
     _console_log 3 "letterbox dimensions: $LB_WIDTH x $LB_HEIGHT"
     # Pipe the letterboxed stream inside the loopback video device /dev/video2
-    ffmpeg -i tcp://localhost:10080 \
+    ffmpeg -i tcp://localhost:$_LOCAL_STREAMING_PORT \
         -loglevel quiet \
         -c:v rawvideo \
         -vf "scale=(iw*sar)*min($LB_WIDTH/(iw*sar)\,$LB_HEIGHT/ih):ih*min($LB_WIDTH/(iw*sar)\,$LB_HEIGHT/ih), pad=$LB_WIDTH:$LB_HEIGHT:($LB_WIDTH-iw*min($LB_WIDTH/iw\,$LB_HEIGHT/ih))/2:($LB_HEIGHT-ih*min($LB_WIDTH/iw\,$LB_HEIGHT/ih))/2" \
         -pix_fmt yuv420p \
         -f v4l2 \
         -framerate 30 \
-        /dev/video2
+        "/dev/video$DEVICE_NUMBER"
 else
     # Pipe the scrcpy stream inside the loopback video device /dev/video2
-    ffmpeg -i tcp://localhost:10080 \
+    ffmpeg -i tcp://localhost:$_LOCAL_STREAMING_PORT \
         -loglevel quiet \
         -c:v rawvideo \
         -pix_fmt yuv420p \
         -f v4l2 \
         -framerate 30 \
-        /dev/video2
+        "/dev/video$DEVICE_NUMBER"
 fi
 
 # Turn screen off again and disconnect all ADB devices

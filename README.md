@@ -15,6 +15,61 @@ I recommend pairing this script with the [OpenCamera](https://play.google.com/st
 - automatic 16:9 letterboxing, based on the device resolution
 - streaming over WiFi, using ADB in `tcpip` mode
 - checks the device battery on startup, and locks the screen when video terminates
+- stream specific Android device to specific loopback video device
+
+## Use multiple Android devices
+
+**DISCLAIMER**: before attempting to follow the instructions below, you must 
+install all the dependencies and know how to use this script: you must have 
+read through this guide at least once!
+
+#### Load multiple video devices
+
+This is a new proof of concept that I recently tested out: first of all, ensure 
+that there is no other loopback device already created by unloading the kernel 
+module; you should run the following command:
+
+```bash
+sudo rmmod v4l2loopback
+```
+
+If you get the error "*rmmod: ERROR: Module v4l2loopback is in use*", then you 
+can try to log out and log back in to your account, or at worse try to reboot 
+the system.
+
+Now, you **must** manually load the kernel module `v4l2loopback` with the 
+following command (bare in mint that it is an example, and you cannot copy-paste 
+it directly):
+
+```bash
+sudo modprobe v4l2loopback video_nr=2,3 card_label="Android device 123","Android device 456"
+```
+
+- the list of numbers following `video_nr` will determine how many devices will be 
+created and which numbers will they be given (in this case, */dev/video2* and */dev/video3*);
+- the argument `card_label` and the list of strings that follows are optional, 
+and represent the labels that will be assigned to the video devices.
+
+#### Run multiple instances of the script
+
+For each Android device you want to stream the screen to a loopback video device, 
+run this script with the `-n` argument, specifying the device's serial number and 
+the video device number you would like to be streamed to (following the previous 
+example):
+
+```bash
+./ffscrcpy -n 000000000123:2
+./ffscrcpy -n 000000000456:3
+```
+
+You can obtain the serial number though the `adb devices` command; its output 
+would look like (when all devices are attached and authorized):
+
+```
+List of devices attached
+000000000123	device
+000000000456	device
+```
 
 ## Build the dependencies
 
