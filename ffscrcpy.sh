@@ -242,6 +242,8 @@ then
         done
         # Prepare the argument with the device serial for scrcpy to recognize it
         SCRCPY_DEVICE_IP="--serial $DEVICE_IP:5555 "
+        # Use the IP instead of the serial, because of ADB wireless mode
+        DEVICE_SERIAL="$DEVICE_IP"
     fi
 fi
 
