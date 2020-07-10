@@ -47,11 +47,11 @@ function _turn_screen_off() {
     # When terminating the program, send 3 POWER button presses to the phone to
     # unlock and lock again the screen: this prevents the battery from draining
     # because of the opened camera app in the background
-    adb shell input keyevent POWER
+    adb -s $DEVICE_SERIAL shell input keyevent POWER
     sleep 0.2
-    adb shell input keyevent POWER
+    adb -s $DEVICE_SERIAL shell input keyevent POWER
     sleep 0.2
-    adb shell input keyevent POWER
+    adb -s $DEVICE_SERIAL shell input keyevent POWER
     sleep 0.2
     # Moreover, disconnect the ADB server from all devices
     _disconnect_all
@@ -81,7 +81,7 @@ function _killall_scrcpy() {
 #
 # Usage: _get_phone_battery
 function _get_phone_battery() {
-    return $(adb shell dumpsys battery | grep 'level' | grep -oE '[0-9]+')
+    return $(adb -s $DEVICE_SERIAL shell dumpsys battery | grep 'level' | grep -oE '[0-9]+')
 }
 
 
@@ -184,7 +184,7 @@ then
     DEVICE_SERIAL=$(echo $DEVICE_STREAM | cut -d ':' -f 1)
     DEVICE_NUMBER=$(echo $DEVICE_STREAM | cut -d ':' -f 2)
 else
-    DEVICE_SERIAL=$(adb devices | tail -n+2 | head -n1 | grep -oE "^[0-9a-f]+")
+    DEVICE_SERIAL=$(adb devices | tail -n+2 | head -n1 | grep -oE "^[0-9a-zA-Z]+")
     DEVICE_NUMBER=2
 fi
 _console_log 2 "this script will stream the screen from Android device $DEVICE_SERIAL to the loopback device /dev/video$DEVICE_NUMBER"
@@ -225,7 +225,7 @@ then
     adb tcpip 5555 > /dev/null 2>&1
     sleep 2
     _console_log 2 "obtaining Android device's IP address (wlan0)"
-    DEVICE_IP=$(adb shell ip addr show wlan0 2> /dev/null | grep -w "inet" | grep -oE "[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+" | head -n1)
+    DEVICE_IP=$(adb -s $DEVICE_SERIAL shell ip addr show wlan0 2> /dev/null | grep -w "inet" | grep -oE "[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+" | head -n1)
     if [[ -z $DEVICE_IP ]]
     then
         _console_log 0 "unable to establish a connection to the Android device: ensure its WiFi is turned on"
@@ -233,10 +233,11 @@ then
         exit 1
     else
         adb connect $DEVICE_IP:5555 > /dev/null 2>&1
+        _ADB_DEVICES=$(adb devices | grep -w "device" | wc -l)
         _console_log 1 "connected to $DEVICE_IP: now you MUST disconnect the device cable"
         _console_log 1 "                                   ^^^^"
-        # Wait until the number of adb devices is only 1
-        while [[ $(adb devices | grep -w "device" | wc -l) -gt 1 ]]
+        # Wait until the number of adb devices is one less than before
+        while [[ $(adb devices | grep -w "device" | wc -l) -ge $_ADB_DEVICES ]]
         do
             sleep 0.33
         done
@@ -250,7 +251,7 @@ fi
 if [[ $_IS_SCREEN_ON -eq 0 ]]
 then
     # Check if the screen is locked
-    if [[ $(adb shell dumpsys power | grep -o -e 'mHoldingWakeLockSuspendBlocker=false' -e 'mHoldingDisplaySuspendBlocker=false' | wc -l) -eq 2 ]]
+    if [[ $(adb -s $DEVICE_SERIAL shell dumpsys power | grep -o -e 'mHoldingWakeLockSuspendBlocker=false' -e 'mHoldingDisplaySuspendBlocker=false' | wc -l) -eq 2 ]]
     then
         # In case the screen is locked, open a scrcpy window and ask the user to unlock and launch the camera
         _console_log 1 "unlock your device and open the camera app; then close the scrcpy window"
@@ -270,9 +271,9 @@ then
         kill $_PID_SCRCPY_OFF_SCREEN
     fi
     # If the screen is unlocked, try to launch the OpenCamera app if it exists
-    if [[ $(adb shell pm list packages -3 | grep -o net.sourceforge.opencamera) ]]
+    if [[ $(adb -s $DEVICE_SERIAL shell pm list packages -3 | grep -o net.sourceforge.opencamera) ]]
     then
-        adb shell am start -n net.sourceforge.opencamera/net.sourceforge.opencamera.MainActivity > /dev/null 2>&1
+        adb -s $DEVICE_SERIAL shell am start -n net.sourceforge.opencamera/net.sourceforge.opencamera.MainActivity > /dev/null 2>&1
         _console_log 2 "launched the OpenCamera app automatically"
     else
         # If OpenCamera is not installed, inform the user
@@ -281,7 +282,7 @@ then
 fi
 
 # Obtain screen size from ADB shell
-SCR_SIZE=$(adb shell wm size | cut -d ' ' -f 3)
+SCR_SIZE=$(adb -s $DEVICE_SERIAL shell wm size | cut -d ' ' -f 3)
 SCR_WIDTH=$(echo $SCR_SIZE | cut -d 'x' -f 1)
 SCR_HEIGHT=$(echo $SCR_SIZE | cut -d 'x' -f 2)
 
