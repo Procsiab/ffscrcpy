@@ -218,7 +218,7 @@ then
 fi
 
 # If wireless streaming is enabled, the ADB server is restarted into TCP mode
-SCRCPY_DEVICE_IP=""
+SCRCPY_DEVICE_ID=""
 if [[ $_IS_WIRELESS_ADB -eq 1 ]]
 then
     _console_log 2 "starting ADB server in TCP mode on port 5555"
@@ -241,11 +241,15 @@ then
         do
             sleep 0.33
         done
+        # Wait to let the ADB daemon establish the connection
+        sleep 2
         # Prepare the argument with the device serial for scrcpy to recognize it
-        SCRCPY_DEVICE_IP="--serial $DEVICE_IP:5555 "
+        SCRCPY_DEVICE_ID="$DEVICE_IP:5555"
         # Use the IP instead of the serial, because of ADB wireless mode
         DEVICE_SERIAL="$DEVICE_IP"
     fi
+else
+    SCRCPY_DEVICE_ID="$DEVICE_SERIAL"
 fi
 
 if [[ $_IS_SCREEN_ON -eq 0 ]]
@@ -255,15 +259,13 @@ then
     then
         # In case the screen is locked, open a scrcpy window and ask the user to unlock and launch the camera
         _console_log 1 "unlock your device and open the camera app; then close the scrcpy window"
-        scrcpy $SCRCPY_DEVICE_IP\
-            --serial $DEVICE_SERIAL \
+        scrcpy --serial $SCRCPY_DEVICE_ID \
             --turn-screen-off \
             > /dev/null 2>&1
     else
         # If the screen is unlocked, run directly scrcpy with turn off display flag and stop it
         _console_log 2 "turning screen off during the streaming"
-        scrcpy $SCRCPY_DEVICE_IP\
-            --serial $DEVICE_SERIAL \
+        scrcpy --serial $SCRCPY_DEVICE_ID \
             --turn-screen-off \
             > /dev/null 2>&1 &
         _PID_SCRCPY_OFF_SCREEN=$!
@@ -295,8 +297,7 @@ then
     if [[ $_IS_CROPPED -eq 1 ]]
     then
         # Screen off and cropping enabled
-        scrcpy $SCRCPY_DEVICE_IP\
-            --serial $DEVICE_SERIAL \
+        scrcpy --serial $SCRCPY_DEVICE_ID \
             --max-fps 30 \
             --turn-screen-off \
             --crop $SCR_WIDTH:$(($SCR_HEIGHT - $(($OC_UI_WIDTH * 2)))):0:240 \
@@ -305,8 +306,7 @@ then
             > /dev/null 2>&1 &
     else
         # Screen off and cropping disabled
-        scrcpy $SCRCPY_DEVICE_IP\
-            --serial $DEVICE_SERIAL \
+        scrcpy --serial $SCRCPY_DEVICE_ID \
             --max-fps 30 \
             --turn-screen-off \
             --no-display \
@@ -317,8 +317,7 @@ else
     if [[ $_IS_CROPPED -eq 1 ]]
     then
         # Screen on and cropping enabled
-        scrcpy $SCRCPY_DEVICE_IP\
-            --serial $DEVICE_SERIAL \
+        scrcpy --serial $SCRCPY_DEVICE_ID \
             --max-fps 30 \
             --crop $SCR_WIDTH:$(($SCR_HEIGHT - $(($OC_UI_WIDTH * 2)))):0:240 \
             --no-display \
@@ -326,8 +325,7 @@ else
             > /dev/null 2>&1 &
     else
         # Screen on and cropping disabled
-        scrcpy $SCRCPY_DEVICE_IP\
-            --serial $DEVICE_SERIAL \
+        scrcpy --serial $SCRCPY_DEVICE_ID \
             --max-fps 30 \
             --no-display \
             --serve tcp:localhost:$_LOCAL_STREAMING_PORT \
