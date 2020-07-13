@@ -175,7 +175,7 @@ do
             ;;
         n)
             read _ARGUMENT _DISCARD <<<"${@:$OPTIND}"
-            if [[ $_ARGUMENT =~ ^[0-9a-f]+:[0-9]$ ]]
+            if [[ $_ARGUMENT =~ ^[0-9a-zA-Z]+:[0-9]$ ]]
             then
                 DEVICE_STREAM=$_ARGUMENT
                 shift
