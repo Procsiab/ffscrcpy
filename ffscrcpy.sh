@@ -91,20 +91,27 @@ _IS_SKIP_CHECKS=0
 _IS_LETTERBOXED=0
 _IS_WIRELESS_ADB=0
 _IS_CROPPED=1
+CUSTOM_CROP=""
+MAX_DIMENSION=""
+BITRATE=""
 DEVICE_NUMBER=0
 DEVICE_SERIAL=0000000
 DEVICE_STREAM=""
 LB_CUSTOM_SIZE=""
-while getopts ":hoslwvCn" OPT
+while getopts ":hoslwvCcmbn" OPT
 do
     case $OPT in
         h)
-            echo "[HELP] Usage: android-cam [-s] [-m] [-l <DIMENSIONS>] [-C] [-n SERIAL:NUMBER] [-w] [-v LEVEL]"
+            echo "[HELP] Usage: android-cam [-s] [-m] [-l <DIMENSIONS>] [-C] [-c X:Y:OFS_X:OFS_Y] [-m PIXELS] [-b MBPS] [-n SERIAL:NUMBER] [-w] [-v LEVEL]"
             echo "[HELP]    -o: Keep phone screen on"
             echo "[HELP]    -s: Skip startup checks"
             echo "[HELP]    -l: Letterbox with phone screen dimensions
 [HELP]        or specific ones, in the form of WxH in pixels"
             echo "[HELP]    -C: Do not crop the canvas to hide the OpenCamera UI"
+            echo "[HELP]    -c: Crop the canvas using custom X:Y:OFS_X:OFS_Y dimensions"
+            echo "[HELP]    -m: Maximum dimension for the viewport (will be scaled accordingly)"
+            echo "[HELP]    -b: Bitrate in Megabits/s; an integer followed by a capital 'M'
+[HELP]        (defaults to 8M)"
             echo "[HELP]    -n: Choose the number to assign to the /dev/video device
 [HELP]        (defaults to 2) and the serial of the Android device
 [HELP]        (defaults to the first recognized device from ADB)"
@@ -133,6 +140,39 @@ do
         C)
             _IS_CROPPED=0
             ;;
+        c)
+            read _ARGUMENT _DISCARD <<<"${@:$OPTIND}"
+            if [[ $_ARGUMENT =~ ^[0-9]+:[0-9]+:[0-9]+:[0-9]+$ ]]
+            then
+                CUSTOM_CROP=$_ARGUMENT
+                shift
+            else
+                _console_log 0 "invalid custom crop size: you must provide four integers separated by ':' (colons)"
+                exit 1
+            fi
+            ;;
+        m)
+            read _ARGUMENT _DISCARD <<<"${@:$OPTIND}"
+            if [[ $_ARGUMENT =~ ^[0-9]+$ ]]
+            then
+                MAX_DIMENSION=$_ARGUMENT
+                shift
+            else
+                _console_log 0 "invalid maximum dimension: provide an integer"
+                exit 1
+            fi
+            ;;
+        b)
+            read _ARGUMENT _DISCARD <<<"${@:$OPTIND}"
+            if [[ $_ARGUMENT =~ ^[0-9]+M$ ]]
+            then
+                BITRATE=$_ARGUMENT
+                shift
+            else
+                _console_log 0 "invalid bitrate value: provide an integer followed by capital 'M'"
+                exit 1
+            fi
+            ;;
         n)
             read _ARGUMENT _DISCARD <<<"${@:$OPTIND}"
             if [[ $_ARGUMENT =~ ^[0-9a-f]+:[0-9]$ ]]
@@ -140,7 +180,7 @@ do
                 DEVICE_STREAM=$_ARGUMENT
                 shift
             else
-                _console_log 0 "invalid device association: provide the serial number and the video device number, separated by a ':' (colon)"
+                _console_log 0 "invalid device (is it plugged in?): provide the serial number and the video device number, separated by a ':' (colon)"
                 exit 1
             fi
             ;;
@@ -283,13 +323,30 @@ then
     fi
 fi
 
-# Obtain screen size from ADB shell
-SCR_SIZE=$(adb -s $DEVICE_SERIAL shell wm size | cut -d ' ' -f 3)
-SCR_WIDTH=$(echo $SCR_SIZE | cut -d 'x' -f 1)
-SCR_HEIGHT=$(echo $SCR_SIZE | cut -d 'x' -f 2)
+# Manage custom cropping
+if [[ -z $CUSTOM_CROP ]]
+then
+    # Obtain screen size from ADB shell
+    SCR_SIZE=$(adb -s $DEVICE_SERIAL shell wm size | cut -d ' ' -f 3)
+    SCR_WIDTH=$(echo $SCR_SIZE | cut -d 'x' -f 1)
+    SCR_HEIGHT=$(echo $SCR_SIZE | cut -d 'x' -f 2)
+    # Crop the OpenCamera UI
+    OC_UI_WIDTH=240
+    # Set the cropping pattern inside the related variable
+    CUSTOM_CROP="$SCR_WIDTH:$(($SCR_HEIGHT - $(($OC_UI_WIDTH * 2)))):0:$OC_UI_WIDTH"
+fi
 
-# Crop the OpenCamera UI
-OC_UI_WIDTH=240
+# Check custom bitrate and viewport scaling parameters
+if [[ ! -z $MAX_DIMENSION ]]
+then
+    MAX_DIMENSION="-m $MAX_DIMENSION "
+fi
+if [[ ! -z $BITRATE ]]
+then
+    BITRATE="-b $BITRATE "
+fi
+_CUSTOM_OPTS="$MAX_DIMENSION$BITRATE"
+
 # Capture the Android smartphone screen, crop it and send it to the socket 127.0.0.1:10080+DEVICE_NUMBER
 _LOCAL_STREAMING_PORT=$((10080 + $DEVICE_NUMBER))
 if [[ $_IS_SCREEN_ON -eq 0 ]]
@@ -297,16 +354,16 @@ then
     if [[ $_IS_CROPPED -eq 1 ]]
     then
         # Screen off and cropping enabled
-        scrcpy --serial $SCRCPY_DEVICE_ID \
+        scrcpy --serial $SCRCPY_DEVICE_ID $_CUSTOM_OPTS\
             --max-fps 30 \
             --turn-screen-off \
-            --crop $SCR_WIDTH:$(($SCR_HEIGHT - $(($OC_UI_WIDTH * 2)))):0:240 \
+            --crop $CUSTOM_CROP \
             --no-display \
             --serve tcp:localhost:$_LOCAL_STREAMING_PORT \
             > /dev/null 2>&1 &
     else
         # Screen off and cropping disabled
-        scrcpy --serial $SCRCPY_DEVICE_ID \
+        scrcpy --serial $SCRCPY_DEVICE_ID $_CUSTOM_OPTS\
             --max-fps 30 \
             --turn-screen-off \
             --no-display \
@@ -317,15 +374,15 @@ else
     if [[ $_IS_CROPPED -eq 1 ]]
     then
         # Screen on and cropping enabled
-        scrcpy --serial $SCRCPY_DEVICE_ID \
+        scrcpy --serial $SCRCPY_DEVICE_ID $_CUSTOM_OPTS\
             --max-fps 30 \
-            --crop $SCR_WIDTH:$(($SCR_HEIGHT - $(($OC_UI_WIDTH * 2)))):0:240 \
+            --crop $CUSTOM_CROP \
             --no-display \
             --serve tcp:localhost:$_LOCAL_STREAMING_PORT \
             > /dev/null 2>&1 &
     else
         # Screen on and cropping disabled
-        scrcpy --serial $SCRCPY_DEVICE_ID \
+        scrcpy --serial $SCRCPY_DEVICE_ID $_CUSTOM_OPTS\
             --max-fps 30 \
             --no-display \
             --serve tcp:localhost:$_LOCAL_STREAMING_PORT \
