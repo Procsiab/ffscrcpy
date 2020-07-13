@@ -206,15 +206,17 @@ do
 done
 
 # Ensure that no other scrcpy processes are already running
-_killall_scrcpy
+if [[ $_IS_SKIP_CHECKS -eq 0 ]]
+then
+    _killall_scrcpy
+fi
 
 # Start ADB server
-if [[ $(adb get-state > /dev/null 2>&1; echo $?) -eq 0 ]]
+if [[ $(adb devices | grep -w "device" | wc -l) -gt 0 ]]
 then
     _console_log 2 "ADB server connected"
-elif [[ $(adb get-state > /dev/null 2>&1; echo $?) -eq 1 ]]
-then
-    _console_log 0 "no Android device was detected: ensure you have connected it and you run this program with the correct permissions"
+else
+    _console_log 0 "no authorized Android device was detected: ensure you have connected it and you run this program with the correct permissions"
     exit 1
 fi
 
@@ -282,8 +284,7 @@ then
             sleep 0.33
         done
         # Wait to let the ADB daemon establish the connection
-        adb devices > /dev/null 2>&1
-        sleep 3
+        sleep 10
         # Prepare the argument with the device serial for scrcpy to recognize it
         SCRCPY_DEVICE_ID="$DEVICE_IP:5555"
         # Use the IP instead of the serial, because of ADB wireless mode
