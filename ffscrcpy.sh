@@ -282,7 +282,8 @@ then
             sleep 0.33
         done
         # Wait to let the ADB daemon establish the connection
-        sleep 2
+        adb devices > /dev/null 2>&1
+        sleep 3
         # Prepare the argument with the device serial for scrcpy to recognize it
         SCRCPY_DEVICE_ID="$DEVICE_IP:5555"
         # Use the IP instead of the serial, because of ADB wireless mode
