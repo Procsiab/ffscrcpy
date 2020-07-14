@@ -179,8 +179,13 @@ do
             then
                 DEVICE_STREAM=$_ARGUMENT
                 shift
+            elif [[ $_ARGUMENT =~ ^[0-9]+.[0-9]+.[0-9]+.[0-9]+:[0-9]+:[0-9]$ ]]
+            then
+                DEVICE_STREAM=$_ARGUMENT
+                shift
             else
-                _console_log 0 "invalid device (is it plugged in?): provide the serial number and the video device number, separated by a ':' (colon)"
+                _console_log 0 "invalid device name: provide the serial number and the video device number, separated by a ':' (colon)"
+                _console_log 0 "if you wish to connect through ADB over TCP, use IP:PORT:VIDEO_NUMBER syntax for this argument"
                 exit 1
             fi
             ;;
@@ -223,8 +228,14 @@ fi
 # Check if a custom device streaming association was provided
 if [[ -n $DEVICE_STREAM ]]
 then
-    DEVICE_SERIAL=$(echo $DEVICE_STREAM | cut -d ':' -f 1)
-    DEVICE_NUMBER=$(echo $DEVICE_STREAM | cut -d ':' -f 2)
+    if [[ $(echo $DEVICE_STREAM | cut -d ':' -f2 | wc -m) -eq 2 ]]
+    then
+        DEVICE_SERIAL=$(echo $DEVICE_STREAM | cut -d ':' -f 1)
+        DEVICE_NUMBER=$(echo $DEVICE_STREAM | cut -d ':' -f 2)
+    else
+        DEVICE_SERIAL="$(echo $DEVICE_STREAM | cut -d ':' -f 1):$(echo $DEVICE_STREAM | cut -d ':' -f 2)"
+        DEVICE_NUMBER=$(echo $DEVICE_STREAM | cut -d ':' -f 3)
+    fi
 else
     DEVICE_SERIAL=$(adb devices | tail -n+2 | head -n1 | grep -oE "^[0-9a-zA-Z]+")
     DEVICE_NUMBER=2
