@@ -102,7 +102,7 @@ while getopts ":hoslwvCcmbn" OPT
 do
     case $OPT in
         h)
-            echo "[HELP] Usage: android-cam [-s] [-m] [-l <DIMENSIONS>] [-C] [-c X:Y:OFS_X:OFS_Y] [-m PIXELS] [-b MBPS] [-n SERIAL:NUMBER] [-w] [-v LEVEL]"
+            echo "[HELP] Usage: ffscrcpy [-s] [-m] [-l <DIMENSIONS>] [-C] [-c X:Y:OFS_X:OFS_Y] [-m PIXELS] [-b MBPS] [-n SERIAL:NUMBER] [-w] [-v LEVEL]"
             echo "[HELP]    -o: Keep phone screen on"
             echo "[HELP]    -s: Skip startup checks"
             echo "[HELP]    -l: Letterbox with phone screen dimensions
