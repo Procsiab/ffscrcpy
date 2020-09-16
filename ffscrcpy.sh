@@ -91,6 +91,7 @@ _IS_SKIP_CHECKS=0
 _IS_LETTERBOXED=0
 _IS_WIRELESS_ADB=0
 _IS_CROPPED=1
+_IS_FLIPPED=0
 CUSTOM_CROP=""
 MAX_DIMENSION=""
 BITRATE=""
@@ -98,7 +99,7 @@ DEVICE_NUMBER=0
 DEVICE_SERIAL=0000000
 DEVICE_STREAM=""
 LB_CUSTOM_SIZE=""
-while getopts ":hoslwvCcmbn" OPT
+while getopts ":hoslwvfCcmbn" OPT
 do
     case $OPT in
         h)
@@ -107,6 +108,7 @@ do
             echo "[HELP]    -s: Skip startup checks"
             echo "[HELP]    -l: Letterbox with phone screen dimensions
 [HELP]        or specific ones, in the form of WxH in pixels"
+            echo "[HELP]    -f: Flip horizontally the video source"
             echo "[HELP]    -C: Do not crop the canvas to hide the OpenCamera UI"
             echo "[HELP]    -c: Crop the canvas using custom X:Y:OFS_X:OFS_Y dimensions"
             echo "[HELP]    -m: Maximum dimension for the viewport (will be scaled accordingly)"
@@ -136,6 +138,9 @@ do
                 _console_log 0 "invalid letterboxing dimensions: use two integers separated by an 'x' (lowercase)"
                 exit 1
             fi
+            ;;
+        f)
+            _IS_FLIPPED=1
             ;;
         C)
             _IS_CROPPED=0
@@ -430,23 +435,50 @@ then
     fi
     _console_log 3 "letterbox dimensions: $LB_WIDTH x $LB_HEIGHT"
     # Pipe the letterboxed stream inside the loopback video device /dev/video2
-    ffmpeg -i tcp://localhost:$_LOCAL_STREAMING_PORT \
-        -loglevel quiet \
-        -c:v rawvideo \
-        -vf "scale=(iw*sar)*min($LB_WIDTH/(iw*sar)\,$LB_HEIGHT/ih):ih*min($LB_WIDTH/(iw*sar)\,$LB_HEIGHT/ih), pad=$LB_WIDTH:$LB_HEIGHT:($LB_WIDTH-iw*min($LB_WIDTH/iw\,$LB_HEIGHT/ih))/2:($LB_HEIGHT-ih*min($LB_WIDTH/iw\,$LB_HEIGHT/ih))/2" \
-        -pix_fmt yuv420p \
-        -f v4l2 \
-        -framerate 30 \
-        "/dev/video$DEVICE_NUMBER"
+    if [[ $_IS_FLIPPED -eq 0 ]]
+    then
+        ffmpeg -i tcp://localhost:$_LOCAL_STREAMING_PORT \
+            -loglevel quiet \
+            -c:v rawvideo \
+            -vf "scale=(iw*sar)*min($LB_WIDTH/(iw*sar)\,$LB_HEIGHT/ih):ih*min($LB_WIDTH/(iw*sar)\,$LB_HEIGHT/ih), pad=$LB_WIDTH:$LB_HEIGHT:($LB_WIDTH-iw*min($LB_WIDTH/iw\,$LB_HEIGHT/ih))/2:($LB_HEIGHT-ih*min($LB_WIDTH/iw\,$LB_HEIGHT/ih))/2" \
+            -pix_fmt yuv420p \
+            -f v4l2 \
+            -framerate 30 \
+            "/dev/video$DEVICE_NUMBER"
+    else
+        _console_log 3 "Video flipped horizontally"
+        ffmpeg -i tcp://localhost:$_LOCAL_STREAMING_PORT \
+            -loglevel quiet \
+            -c:v rawvideo \
+            -vf "scale=(iw*sar)*min($LB_WIDTH/(iw*sar)\,$LB_HEIGHT/ih):ih*min($LB_WIDTH/(iw*sar)\,$LB_HEIGHT/ih), pad=$LB_WIDTH:$LB_HEIGHT:($LB_WIDTH-iw*min($LB_WIDTH/iw\,$LB_HEIGHT/ih))/2:($LB_HEIGHT-ih*min($LB_WIDTH/iw\,$LB_HEIGHT/ih))/2" \
+            -vf "transpose=2,transpose=0" \
+            -pix_fmt yuv420p \
+            -f v4l2 \
+            -framerate 30 \
+            "/dev/video$DEVICE_NUMBER"
+    fi
 else
     # Pipe the scrcpy stream inside the loopback video device /dev/video2
-    ffmpeg -i tcp://localhost:$_LOCAL_STREAMING_PORT \
-        -loglevel quiet \
-        -c:v rawvideo \
-        -pix_fmt yuv420p \
-        -f v4l2 \
-        -framerate 30 \
-        "/dev/video$DEVICE_NUMBER"
+    if [[ $_IS_FLIPPED -eq 0 ]]
+    then
+        ffmpeg -i tcp://localhost:$_LOCAL_STREAMING_PORT \
+            -loglevel quiet \
+            -c:v rawvideo \
+            -pix_fmt yuv420p \
+            -f v4l2 \
+            -framerate 30 \
+            "/dev/video$DEVICE_NUMBER"
+    else
+        _console_log 3 "Video flipped horizontally"
+        ffmpeg -i tcp://localhost:$_LOCAL_STREAMING_PORT \
+            -loglevel quiet \
+            -c:v rawvideo \
+            -pix_fmt yuv420p \
+            -vf "transpose=2,transpose=0" \
+            -f v4l2 \
+            -framerate 30 \
+            "/dev/video$DEVICE_NUMBER"
+    fi
 fi
 
 # Turn screen off again and disconnect all ADB devices
