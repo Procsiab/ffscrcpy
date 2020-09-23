@@ -256,7 +256,7 @@ then
         _console_log 2 "module already loaded, no new video device will be created"
     else
         _console_log 1 "requesting module loading: grant root permissions"
-        sudo modprobe v4l2loopback video_nr="$DEVICE_NUMBER" card_label="Android Camera"
+        sudo modprobe v4l2loopback video_nr="$DEVICE_NUMBER" card_label="Android Camera" exclusive_caps=1
         _console_log 2 "loaded /dev/video$DEVICE_NUMBER device with name \"Android Camera\""
     fi
 
