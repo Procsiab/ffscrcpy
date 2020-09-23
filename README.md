@@ -134,6 +134,22 @@ sudo systemctl reboot --now
 
 **NOTE**: to sign the same module with the same certificate, for a new version of the kernel, after compiling it just repeat the step 2.
 
+#### [bonus] show timeout image
+
+To show a specific image when the loopback device has no stream fed into it, you need two additional tools:
+
+- `v4l-utils`, a package that will install the v4l2-ctl CLI;
+- `v4l2loopback-ctl`, the CLI to interact with the loopback devices, which can be installed by running the following command inside the repository of `v4l2loopback`:
+    ```bash
+    sudo make install-utils
+    ```
+
+At this point, **AFTER** piping a video stream into your loopback device (e.g. `/dev/video1`), you can set a custom timeout picture running the command:
+```bash
+v4l2loopback-ctl set-timeout-image /path/to/image.png /dev/video1
+```
+
+
 ### scrcpy
 
 A [fork](https://github.com/Darkroll76/scrcpy/tree/serve) of the [original](https://github.com/Genymobile/scrcpy) project, which enables a TCP connection to the scrcpy server.
