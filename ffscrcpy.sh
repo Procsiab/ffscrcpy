@@ -92,6 +92,7 @@ _IS_LETTERBOXED=0
 _IS_WIRELESS_ADB=0
 _IS_CROPPED=1
 _IS_FLIPPED=0
+_IS_AUTO_LAUNCH=1
 CUSTOM_CROP=""
 MAX_DIMENSION=""
 BITRATE=""
@@ -99,7 +100,7 @@ DEVICE_NUMBER=0
 DEVICE_SERIAL=0000000
 DEVICE_STREAM=""
 LB_CUSTOM_SIZE=""
-while getopts ":hoslwvfCcmbn" OPT
+while getopts ":hoslwvfCAcmbn" OPT
 do
     case $OPT in
         h)
@@ -110,6 +111,7 @@ do
 [HELP]        or specific ones, in the form of WxH in pixels"
             echo "[HELP]    -f: Flip horizontally the video source"
             echo "[HELP]    -C: Do not crop the canvas to hide the OpenCamera UI"
+            echo "[HELP]    -A: Do not try to automatically launch the OpenCamera app"
             echo "[HELP]    -c: Crop the canvas using custom X:Y:OFS_X:OFS_Y dimensions"
             echo "[HELP]    -m: Maximum dimension for the viewport (will be scaled accordingly)"
             echo "[HELP]    -b: Bitrate in Megabits/s; an integer followed by a capital 'M'
@@ -144,6 +146,9 @@ do
             ;;
         C)
             _IS_CROPPED=0
+            ;;
+        A)
+            _IS_AUTO_LAUNCH=0
             ;;
         c)
             read _ARGUMENT _DISCARD <<<"${@:$OPTIND}"
@@ -313,7 +318,7 @@ fi
 if [[ $_IS_SCREEN_ON -eq 0 ]]
 then
     # Check if the screen is locked
-    if [[ $(adb -s $DEVICE_SERIAL shell dumpsys power | grep -o -e 'mHoldingWakeLockSuspendBlocker=false' -e 'mHoldingDisplaySuspendBlocker=false' | wc -l) -eq 2 ]]
+    if [[ $(adb -s $DEVICE_SERIAL shell dumpsys power | grep -o -e 'mHoldingWakeLockSuspendBlocker=false' -e 'mHoldingDisplaySuspendBlocker=false' | wc -l) -eq 2 || $_IS_AUTO_LAUNCH -eq 0 ]]
     then
         # In case the screen is locked, open a scrcpy window and ask the user to unlock and launch the camera
         _console_log 1 "unlock your device and open the camera app; then close the scrcpy window"
@@ -327,17 +332,20 @@ then
             --turn-screen-off \
             > /dev/null 2>&1 &
         _PID_SCRCPY_OFF_SCREEN=$!
-        sleep 1.5
+        sleep 2
         kill $_PID_SCRCPY_OFF_SCREEN
     fi
-    # If the screen is unlocked, try to launch the OpenCamera app if it exists
-    if [[ $(adb -s $DEVICE_SERIAL shell pm list packages -3 | grep -o net.sourceforge.opencamera) ]]
+    if [[ $_IS_AUTO_LAUNCH -eq 1 ]]
     then
-        adb -s $DEVICE_SERIAL shell am start -n net.sourceforge.opencamera/net.sourceforge.opencamera.MainActivity > /dev/null 2>&1
-        _console_log 2 "launched the OpenCamera app automatically"
-    else
-        # If OpenCamera is not installed, inform the user
-        _console_log 1 "OpenCamera app was not found: the current screen will be captured"
+        # If the screen is unlocked, try to launch the OpenCamera app if it exists
+        if [[ $(adb -s $DEVICE_SERIAL shell pm list packages -3 | grep -o net.sourceforge.opencamera) ]]
+        then
+            adb -s $DEVICE_SERIAL shell am start -n net.sourceforge.opencamera/net.sourceforge.opencamera.MainActivity > /dev/null 2>&1
+            _console_log 2 "launched the OpenCamera app automatically"
+        else
+            # If OpenCamera is not installed, inform the user
+            _console_log 1 "OpenCamera app was not found: the current screen will be captured"
+        fi
     fi
 fi
 
