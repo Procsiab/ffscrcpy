@@ -8,9 +8,8 @@
 # - ffmpeg toolset
 #
 ## Assumptions:
-# - there will be only one android device connected
 # - the user who runs the script has access without root to its Android device ADB session
-# - the smartphone will run the OpenCamera app
+# - the smartphone may run the OpenCamera app
 # - the sockets on localhost from port 10080 to 10089 are bindable
 
 
