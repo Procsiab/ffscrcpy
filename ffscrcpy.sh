@@ -94,16 +94,17 @@ _IS_FLIPPED=0
 _IS_AUTO_LAUNCH=1
 CUSTOM_CROP=""
 MAX_DIMENSION=""
+MAX_FPS=30
 BITRATE=""
 DEVICE_NUMBER=0
 DEVICE_SERIAL=0000000
 DEVICE_STREAM=""
 LB_CUSTOM_SIZE=""
-while getopts ":hoslwvfCAcmbn" OPT
+while getopts ":hoslwvfCAcmbnp" OPT
 do
     case $OPT in
         h)
-            echo "[HELP] Usage: ffscrcpy [-s] [-m] [-l <DIMENSIONS>] [-C] [-c X:Y:OFS_X:OFS_Y] [-m PIXELS] [-b MBPS] [-n SERIAL:NUMBER] [-w] [-v LEVEL]"
+            echo "[HELP] Usage: ffscrcpy [-s] [-m] [-l <DIMENSIONS>] [-C] [-c X:Y:OFS_X:OFS_Y] [-A] [-m PIXELS] [-b MBPS] [-p FPS] [-n SERIAL:NUMBER] [-w] [-v LEVEL]"
             echo "[HELP]    -o: Keep phone screen on"
             echo "[HELP]    -s: Skip startup checks"
             echo "[HELP]    -l: Letterbox with phone screen dimensions
@@ -115,6 +116,7 @@ do
             echo "[HELP]    -m: Maximum dimension for the viewport (will be scaled accordingly)"
             echo "[HELP]    -b: Bitrate in Megabits/s; an integer followed by a capital 'M'
 [HELP]        (defaults to 8M)"
+            echo "[HELP]    -p: Maximum FPS for video; provide an integer number"
             echo "[HELP]    -n: Choose the number to assign to the /dev/video device
 [HELP]        (defaults to 2) and the serial of the Android device
 [HELP]        (defaults to the first recognized device from ADB)"
@@ -179,6 +181,17 @@ do
                 shift
             else
                 _console_log 0 "invalid bitrate value: provide an integer followed by capital 'M'"
+                exit 1
+            fi
+            ;;
+        p)
+            read _ARGUMENT _DISCARD <<<"${@:$OPTIND}"
+            if [[ $_ARGUMENT =~ ^[0-9]+$ ]]
+            then
+                MAX_FPS=$_ARGUMENT
+                shift
+            else
+                _console_log 0 "invalid FPS value: provide an integer"
                 exit 1
             fi
             ;;
@@ -380,7 +393,7 @@ then
     then
         # Screen off and cropping enabled
         scrcpy --serial $SCRCPY_DEVICE_ID $_CUSTOM_OPTS\
-            --max-fps 30 \
+            --max-fps $MAX_FPS \
             --turn-screen-off \
             --crop $CUSTOM_CROP \
             --no-display \
@@ -389,7 +402,7 @@ then
     else
         # Screen off and cropping disabled
         scrcpy --serial $SCRCPY_DEVICE_ID $_CUSTOM_OPTS\
-            --max-fps 30 \
+            --max-fps $MAX_FPS \
             --turn-screen-off \
             --no-display \
             --serve tcp:localhost:$_LOCAL_STREAMING_PORT \
@@ -400,7 +413,7 @@ else
     then
         # Screen on and cropping enabled
         scrcpy --serial $SCRCPY_DEVICE_ID $_CUSTOM_OPTS\
-            --max-fps 30 \
+            --max-fps $MAX_FPS \
             --crop $CUSTOM_CROP \
             --no-display \
             --serve tcp:localhost:$_LOCAL_STREAMING_PORT \
@@ -408,7 +421,7 @@ else
     else
         # Screen on and cropping disabled
         scrcpy --serial $SCRCPY_DEVICE_ID $_CUSTOM_OPTS\
-            --max-fps 30 \
+            --max-fps $MAX_FPS \
             --no-display \
             --serve tcp:localhost:$_LOCAL_STREAMING_PORT \
             > /dev/null 2>&1 &
@@ -450,7 +463,6 @@ then
             -vf "scale=(iw*sar)*min($LB_WIDTH/(iw*sar)\,$LB_HEIGHT/ih):ih*min($LB_WIDTH/(iw*sar)\,$LB_HEIGHT/ih), pad=$LB_WIDTH:$LB_HEIGHT:($LB_WIDTH-iw*min($LB_WIDTH/iw\,$LB_HEIGHT/ih))/2:($LB_HEIGHT-ih*min($LB_WIDTH/iw\,$LB_HEIGHT/ih))/2" \
             -pix_fmt yuv420p \
             -f v4l2 \
-            -framerate 30 \
             "/dev/video$DEVICE_NUMBER"
     else
         _console_log 3 "Video flipped horizontally"
@@ -461,7 +473,6 @@ then
             -vf "transpose=2,transpose=0" \
             -pix_fmt yuv420p \
             -f v4l2 \
-            -framerate 30 \
             "/dev/video$DEVICE_NUMBER"
     fi
 else
@@ -473,7 +484,6 @@ else
             -c:v rawvideo \
             -pix_fmt yuv420p \
             -f v4l2 \
-            -framerate 30 \
             "/dev/video$DEVICE_NUMBER"
     else
         _console_log 3 "Video flipped horizontally"
@@ -483,7 +493,6 @@ else
             -pix_fmt yuv420p \
             -vf "transpose=2,transpose=0" \
             -f v4l2 \
-            -framerate 30 \
             "/dev/video$DEVICE_NUMBER"
     fi
 fi
