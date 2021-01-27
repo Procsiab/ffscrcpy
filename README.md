@@ -16,6 +16,7 @@ I recommend pairing this script with the [OpenCamera](https://play.google.com/st
 - streaming over WiFi, using ADB in `tcpip` mode
 - checks the device battery on startup, and locks the screen when video terminates
 - stream specific Android device to specific loopback video device
+- some tweaking to the image, like cropping and flipping
 
 ## Use multiple Android devices
 
@@ -42,7 +43,7 @@ following command (bare in mint that it is an example, and you cannot copy-paste
 it directly):
 
 ```bash
-sudo modprobe v4l2loopback video_nr=2,3 card_label="Android device 123","Android device 456"
+sudo modprobe v4l2loopback video_nr=2,3 card_label="Android device 123","Android device 456" exclusive_caps=1
 ```
 
 - the list of numbers following `video_nr` will determine how many devices will be 
@@ -152,7 +153,7 @@ v4l2loopback-ctl set-timeout-image /path/to/image.png /dev/video1
 
 ### scrcpy
 
-A [fork](https://github.com/Darkroll76/scrcpy/tree/serve) of the [original](https://github.com/Genymobile/scrcpy) project, which enables a TCP connection to the scrcpy server.
+A [fork](https://github.com/r3pwn/scrcpy) of the [original](https://github.com/Genymobile/scrcpy) project, which enables a TCP connection to the scrcpy server.
 
 To compile it, just follow the [instructions](https://github.com/Genymobile/scrcpy/blob/master/BUILD.md#system-specific-steps) on the official documentation.
 
