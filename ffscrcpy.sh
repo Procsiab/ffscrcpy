@@ -260,7 +260,8 @@ then
     fi
 else
     DEVICE_SERIAL=$(adb devices | tail -n+2 | head -n1 | grep -oE "^[0-9a-zA-Z]+")
-    DEVICE_NUMBER=2
+    _LAST_DEV=$(ls /dev/video* | sed -rn 's/\/dev\/video([0-9]+)/\1/p' | tail -n1)
+    DEVICE_NUMBER=$((_LAST_DEV + 1))
 fi
 _console_log 2 "this script will stream the screen from Android device $DEVICE_SERIAL to the loopback device /dev/video$DEVICE_NUMBER"
 
