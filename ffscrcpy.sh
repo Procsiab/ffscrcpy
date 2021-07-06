@@ -3,7 +3,7 @@
 # Use your android smartphone as a webcam
 #
 ## Requirements:
-# - scrcpy (Darkrol76's fork, on serve branch)
+# - scrcpy 1.18 or nwewr (Genymobile's original project)
 # - v4l2loopback kernel module
 # - ffmpeg toolset
 #
@@ -87,7 +87,6 @@ function _get_phone_battery() {
 # Parse command line arguments
 _IS_SCREEN_ON=0
 _IS_SKIP_CHECKS=0
-_IS_LETTERBOXED=0
 _IS_WIRELESS_ADB=0
 _IS_CROPPED=1
 _IS_FLIPPED=0
@@ -100,15 +99,13 @@ DEVICE_NUMBER=0
 DEVICE_SERIAL=0000000
 DEVICE_STREAM=""
 LB_CUSTOM_SIZE=""
-while getopts ":hoslwvfCAcmbnp" OPT
+while getopts ":hoswvfCAcmbnp" OPT
 do
     case $OPT in
         h)
             echo "[HELP] Usage: ffscrcpy [-s] [-m] [-l <DIMENSIONS>] [-C] [-c X:Y:OFS_X:OFS_Y] [-A] [-m PIXELS] [-b MBPS] [-p FPS] [-n SERIAL:NUMBER] [-w] [-v LEVEL]"
             echo "[HELP]    -o: Keep phone screen on"
             echo "[HELP]    -s: Skip startup checks"
-            echo "[HELP]    -l: Letterbox with phone screen dimensions
-[HELP]        or specific ones, in the form of WxH in pixels"
             echo "[HELP]    -f: Flip horizontally the video source"
             echo "[HELP]    -C: Do not crop the canvas to hide the OpenCamera UI"
             echo "[HELP]    -A: Do not try to automatically launch the OpenCamera app"
@@ -129,18 +126,6 @@ do
             ;;
         s)
             _IS_SKIP_CHECKS=1
-            ;;
-        l)
-            _IS_LETTERBOXED=1
-            read _ARGUMENT _DISCARD <<<"${@:$OPTIND}"
-            if [[ $_ARGUMENT =~ ^[0-9]+x[0-9]+$ ]]
-            then
-                LB_CUSTOM_SIZE=$_ARGUMENT
-                shift
-            else
-                _console_log 0 "invalid letterboxing dimensions: use two integers separated by an 'x' (lowercase)"
-                exit 1
-            fi
             ;;
         f)
             _IS_FLIPPED=1
@@ -261,7 +246,7 @@ then
 else
     DEVICE_SERIAL=$(adb devices | tail -n+2 | head -n1 | grep -oE "^[0-9a-zA-Z]+")
     _LAST_DEV=$(ls /dev/video* | sed -rn 's/\/dev\/video([0-9]+)/\1/p' | tail -n1)
-    DEVICE_NUMBER=$((_LAST_DEV + 1))
+    DEVICE_NUMBER=$_LAST_DEV
 fi
 _console_log 2 "this script will stream the screen from Android device $DEVICE_SERIAL to the loopback device /dev/video$DEVICE_NUMBER"
 
@@ -273,6 +258,7 @@ then
     then
         _console_log 2 "module already loaded, no new video device will be created"
     else
+        DEVICE_NUMBER=$((DEVICE_NUMBER + 1))
         _console_log 1 "requesting module loading: grant root permissions"
         sudo modprobe v4l2loopback video_nr="$DEVICE_NUMBER" card_label="Android Camera" exclusive_caps=1
         _console_log 2 "loaded /dev/video$DEVICE_NUMBER device with name \"Android Camera\""
@@ -386,8 +372,9 @@ then
 fi
 _CUSTOM_OPTS="$MAX_DIMENSION$BITRATE"
 
-# Capture the Android smartphone screen, crop it and send it to the socket 127.0.0.1:10080+DEVICE_NUMBER
-_LOCAL_STREAMING_PORT=$((10080 + $DEVICE_NUMBER))
+_console_log 2 "scrcpy is capturing the screen, streaming it to /dev/video$DEVICE_NUMBER device"
+_console_log 2 "send keyboard interrupt (CTRL + C) to terminate the streaming"
+# Capture the Android smartphone screen, crop it and send it to the V4L2 loopback device
 if [[ $_IS_SCREEN_ON -eq 0 ]]
 then
     if [[ $_IS_CROPPED -eq 1 ]]
@@ -398,16 +385,16 @@ then
             --turn-screen-off \
             --crop $CUSTOM_CROP \
             --no-display \
-            --serve tcp:localhost:$_LOCAL_STREAMING_PORT \
-            > /dev/null 2>&1 &
+            --v4l2-sink="/dev/video${DEVICE_NUMBER}" \
+            > /dev/null 2>&1
     else
         # Screen off and cropping disabled
         scrcpy --serial $SCRCPY_DEVICE_ID $_CUSTOM_OPTS\
             --max-fps $MAX_FPS \
             --turn-screen-off \
             --no-display \
-            --serve tcp:localhost:$_LOCAL_STREAMING_PORT \
-            > /dev/null 2>&1 &
+            --v4l2-sink="/dev/video${DEVICE_NUMBER}" \
+            > /dev/null 2>&1
     fi
 else
     if [[ $_IS_CROPPED -eq 1 ]]
@@ -417,84 +404,15 @@ else
             --max-fps $MAX_FPS \
             --crop $CUSTOM_CROP \
             --no-display \
-            --serve tcp:localhost:$_LOCAL_STREAMING_PORT \
-            > /dev/null 2>&1 &
+            --v4l2-sink="/dev/video${DEVICE_NUMBER}" \
+            > /dev/null 2>&1
     else
         # Screen on and cropping disabled
         scrcpy --serial $SCRCPY_DEVICE_ID $_CUSTOM_OPTS\
             --max-fps $MAX_FPS \
             --no-display \
-            --serve tcp:localhost:$_LOCAL_STREAMING_PORT \
-            > /dev/null 2>&1 &
-    fi
-fi
-_console_log 2 "scrcpy is capturing the screen, streaming it to localhost:$_LOCAL_STREAMING_PORT"
-
-# Wait for the capture to begin
-sleep 1
-
-# Inform the user on how to quit ffmpeg (once done the scrcpy server will automatically shutdown)
-_console_log 2 "streaming with ffmpeg from local socket to /dev/video$DEVICE_NUMBER device"
-_console_log 2 "press 'q' to terminate the streaming"
-
-# Manage video stream letterboxing
-if [[ $_IS_LETTERBOXED -ne 0 ]]
-then
-    # Choose the letterboxing dimensions for the video stream
-    if [[ -z $LB_CUSTOM_SIZE ]]
-    then
-        LB_WIDTH=$SCR_WIDTH
-        LB_HEIGHT=$SCR_HEIGHT
-    else
-        LB_WIDTH=$(echo $LB_CUSTOM_SIZE | cut -d 'x' -f 1)
-        LB_HEIGHT=$(echo $LB_CUSTOM_SIZE | cut -d 'x' -f 2)
-    fi
-    # Set the dimensions to a 16:9 aspect ratio, swapping them if on portrait display
-    if [[ $LB_HEIGHT -gt $LB_WIDTH ]]
-    then
-        read LB_HEIGHT LB_WIDTH <<<"$LB_WIDTH $LB_HEIGHT"
-    fi
-    _console_log 3 "letterbox dimensions: $LB_WIDTH x $LB_HEIGHT"
-    # Pipe the letterboxed stream inside the loopback video device /dev/video2
-    if [[ $_IS_FLIPPED -eq 0 ]]
-    then
-        ffmpeg -i tcp://localhost:$_LOCAL_STREAMING_PORT \
-            -loglevel quiet \
-            -c:v rawvideo \
-            -vf "scale=(iw*sar)*min($LB_WIDTH/(iw*sar)\,$LB_HEIGHT/ih):ih*min($LB_WIDTH/(iw*sar)\,$LB_HEIGHT/ih), pad=$LB_WIDTH:$LB_HEIGHT:($LB_WIDTH-iw*min($LB_WIDTH/iw\,$LB_HEIGHT/ih))/2:($LB_HEIGHT-ih*min($LB_WIDTH/iw\,$LB_HEIGHT/ih))/2" \
-            -pix_fmt yuv420p \
-            -f v4l2 \
-            "/dev/video$DEVICE_NUMBER"
-    else
-        _console_log 3 "Video flipped horizontally"
-        ffmpeg -i tcp://localhost:$_LOCAL_STREAMING_PORT \
-            -loglevel quiet \
-            -c:v rawvideo \
-            -vf "scale=(iw*sar)*min($LB_WIDTH/(iw*sar)\,$LB_HEIGHT/ih):ih*min($LB_WIDTH/(iw*sar)\,$LB_HEIGHT/ih), pad=$LB_WIDTH:$LB_HEIGHT:($LB_WIDTH-iw*min($LB_WIDTH/iw\,$LB_HEIGHT/ih))/2:($LB_HEIGHT-ih*min($LB_WIDTH/iw\,$LB_HEIGHT/ih))/2" \
-            -vf "transpose=2,transpose=0" \
-            -pix_fmt yuv420p \
-            -f v4l2 \
-            "/dev/video$DEVICE_NUMBER"
-    fi
-else
-    # Pipe the scrcpy stream inside the loopback video device /dev/video2
-    if [[ $_IS_FLIPPED -eq 0 ]]
-    then
-        ffmpeg -i tcp://localhost:$_LOCAL_STREAMING_PORT \
-            -loglevel quiet \
-            -c:v rawvideo \
-            -pix_fmt yuv420p \
-            -f v4l2 \
-            "/dev/video$DEVICE_NUMBER"
-    else
-        _console_log 3 "Video flipped horizontally"
-        ffmpeg -i tcp://localhost:$_LOCAL_STREAMING_PORT \
-            -loglevel quiet \
-            -c:v rawvideo \
-            -pix_fmt yuv420p \
-            -vf "transpose=2,transpose=0" \
-            -f v4l2 \
-            "/dev/video$DEVICE_NUMBER"
+            --v4l2-sink="/dev/video${DEVICE_NUMBER}" \
+            > /dev/null 2>&1
     fi
 fi
 

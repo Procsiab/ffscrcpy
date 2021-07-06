@@ -1,18 +1,19 @@
 # ffscrcpy
 
-ffmpeg + scrcpy + v4l2loopback = 📷
+scrcpy + v4l2loopback = 📷
 
-This script is an automation that combine the three aforementioned tools into a 
+**NEWS**: Since version 1.18, scrcpy supports streaming the device display directly to a V4L2 loopback device, so ffmpeg is not needed anymore in the equation - this meas also lower latency and better stability.
+
+This script is an automation that combine the two aforementioned tools into a 
 not-totally-stable-but-still-works webcam: you will be able to stream the screen 
 of your Android smartphone to any application that uses a `/dev/video` device as 
 a webcam.
 
-I recommend pairing this script with the [OpenCamera](https://play.google.com/store/apps/details?id=net.sourceforge.opencamera) Android app, which offers complete UI hiding on top of other more "mainstream" features (like face detection). Also, the automatic letterboxing is hardcoded, based on the black bars from the OpenCamera UI.
+I recommend pairing this script with the [OpenCamera](https://play.google.com/store/apps/details?id=net.sourceforge.opencamera) Android app, which offers complete UI hiding on top of other more "mainstream" features (like face detection). Also, the automatic cropping is hardcoded, based on the black bars from the OpenCamera UI.
 
 ### Features
 
 - granular logging level setting
-- automatic 16:9 letterboxing, based on the device resolution
 - streaming over WiFi, using ADB in `tcpip` mode
 - checks the device battery on startup, and locks the screen when video terminates
 - stream specific Android device to specific loopback video device
@@ -77,16 +78,6 @@ List of devices attached
 The following instructions are meant to be run on a recent RHEL/Fedora based OS, 
 however they might also apply to any other Unix system, with the correct assumptions.
 
-### ffmpeg
-
-You may just install this from your package manager:
-
-```bash
-sudo dnf install ffmpeg
-```
-
-[Here](https://ffmpeg.org/) you can find more information on this tool.
-
 ### v4l2loopback
 
 [This](https://github.com/umlaeute/v4l2loopback) is a kernel module that you must compile yourself; however, it's pretty straightforward:
@@ -98,7 +89,6 @@ git clone https://github.com/umlaeute/v4l2loopback.git && cd v4l2loopback
 ```
 
 2. compile the kernel module
-
 
 ```bash
 make && sudo make install
@@ -150,12 +140,11 @@ At this point, **AFTER** piping a video stream into your loopback device (e.g. `
 v4l2loopback-ctl set-timeout-image /path/to/image.png /dev/video1
 ```
 
-
 ### scrcpy
 
-A [fork](https://github.com/r3pwn/scrcpy) of the [original](https://github.com/Genymobile/scrcpy) project, which enables a TCP connection to the scrcpy server.
+Since version 1.18, the [original](https://github.com/Genymobile/scrcpy) project enables streaming the viewport to a v4l2 loopback device.
 
-To compile it, just follow the [instructions](https://github.com/Genymobile/scrcpy/blob/master/BUILD.md#system-specific-steps) on the official documentation.
+To compile it, just follow the [instructions](https://github.com/Genymobile/scrcpy/blob/master/BUILD.md#system-specific-steps) on the official documentation, if not available through your distro's package repos.
 
 ## Create a UDev rule for an USB connected Android smartphone
 
