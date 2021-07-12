@@ -2,9 +2,9 @@
 
 scrcpy + v4l2loopback = 📷
 
-**NEWS**: Since version 1.18, scrcpy supports streaming the device display directly to a V4L2 loopback device, so ffmpeg is not needed anymore in the equation - this meas also lower latency and better stability.
+**NEWS**: Since version 1.18, scrcpy supports streaming the device display directly to a V4L2 loopback device, so ffmpeg is not needed anymore in this equation - this meas also lower latency and better stability.
 
-This script is an automation that combine the two aforementioned tools into a 
+This script is an automation that combines the two aforementioned tools into a 
 not-totally-stable-but-still-works webcam: you will be able to stream the screen 
 of your Android smartphone to any application that uses a `/dev/video` device as 
 a webcam.
@@ -15,7 +15,7 @@ I recommend pairing this script with the [OpenCamera](https://play.google.com/st
 
 - granular logging level setting
 - streaming over WiFi, using ADB in `tcpip` mode
-- checks the device battery on startup, and locks the screen when video terminates
+- check the device battery on startup, and lock the screen when video terminates
 - stream specific Android device to specific loopback video device
 - some tweaking to the image, like cropping and flipping
 
@@ -27,7 +27,7 @@ read through this guide at least once!
 
 #### Load multiple video devices
 
-This is a new proof of concept that I recently tested out: first of all, ensure 
+This is a proof of concept that I managed to get it to work: first of all, ensure 
 that there is no other loopback device already created by unloading the kernel 
 module; you should run the following command:
 
@@ -40,8 +40,8 @@ can try to log out and log back in to your account, or at worse try to reboot
 the system.
 
 Now, you **must** manually load the kernel module `v4l2loopback` with the 
-following command (bare in mint that it is an example, and you cannot copy-paste 
-it directly):
+following command (bare in mind that it is an example, and you cannot copy-paste 
+it directly, go on reading to learn more):
 
 ```bash
 sudo modprobe v4l2loopback video_nr=2,3 card_label="Android device 123","Android device 456" exclusive_caps=1
@@ -195,4 +195,4 @@ Finally! Plug your android phone into your PC and run this script:
 ./ffscrcpy.sh
 ```
 
-To get more information about different working modes, use the `-h` argument to summon the integrated help.
+To get more information about the different working modes, use the `-h` argument to print the integrated help.
