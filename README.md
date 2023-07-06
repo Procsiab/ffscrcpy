@@ -2,7 +2,13 @@
 
 scrcpy + v4l2loopback = 📷
 
+---
+
+**NEWS**: Since version 2.1, scrcpy does not allow to both turn the screen off and hide displaying the screen capture window, so at the moment I am using a check on the version number to programmatically apply a workaround to still turn off the smartphone's screen.
+
 **NEWS**: Since version 1.18, scrcpy supports streaming the device display directly to a V4L2 loopback device, so ffmpeg is not needed anymore in this equation - this meas also lower latency and better stability.
+
+---
 
 This script is an automation that combines the two aforementioned tools into a 
 not-totally-stable-but-still-works webcam: you will be able to stream the screen 

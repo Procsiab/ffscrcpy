@@ -3,9 +3,9 @@
 # Use your android smartphone as a webcam
 #
 ## Requirements:
-# - scrcpy 1.18 or nwewr (Genymobile's original project)
+# - scrcpy 1.18 or newewr (Genymobile's original project)
 # - v4l2loopback kernel module
-# - ffmpeg toolset
+# - ffmpeg binary
 #
 ## Assumptions:
 # - the user who runs the script has access without root to its Android device ADB session
@@ -81,6 +81,20 @@ function _killall_scrcpy() {
 # Usage: _get_phone_battery
 function _get_phone_battery() {
     return $(adb -s $DEVICE_SERIAL shell dumpsys battery | grep 'level' | grep -oE '[0-9]+')
+}
+
+
+# Boolean check on the scrcpy version, to account for a renamed parameter
+#
+# Usage: _build_nodisplay_from_scrcpy_version
+function _build_nodisplay_from_scrcpy_version() {
+    local _SCRCPY_VERSION=$(scrcpy -v | head -n1 | cut -f 2 -d ' ')
+    local _NODISPLAY_PARAM="--no-display"
+    if (( $(echo "$_SCRCPY_VERSION > 2.0" | bc -l) ))
+    then
+        local _NODISPLAY_PARAM="--no-audio-playback"
+    fi
+    echo "$_NODISPLAY_PARAM"
 }
 
 
@@ -372,6 +386,9 @@ then
 fi
 _CUSTOM_OPTS="$MAX_DIMENSION$BITRATE"
 
+# Prepare the no display parameter name based on the scrcpy version
+NODISPLAY_PARAM="$(_build_nodisplay_from_scrcpy_version)"
+
 _console_log 2 "scrcpy is capturing the screen, streaming it to /dev/video$DEVICE_NUMBER device"
 _console_log 2 "send keyboard interrupt (CTRL + C) to terminate the streaming"
 # Capture the Android smartphone screen, crop it and send it to the V4L2 loopback device
@@ -384,7 +401,7 @@ then
             --max-fps $MAX_FPS \
             --turn-screen-off \
             --crop $CUSTOM_CROP \
-            --no-display \
+            $NODISPLAY_PARAM \
             --v4l2-sink="/dev/video${DEVICE_NUMBER}" \
             > /dev/null 2>&1
     else
@@ -392,7 +409,7 @@ then
         scrcpy --serial $SCRCPY_DEVICE_ID $_CUSTOM_OPTS\
             --max-fps $MAX_FPS \
             --turn-screen-off \
-            --no-display \
+            $NODISPLAY_PARAM \
             --v4l2-sink="/dev/video${DEVICE_NUMBER}" \
             > /dev/null 2>&1
     fi
@@ -403,14 +420,14 @@ else
         scrcpy --serial $SCRCPY_DEVICE_ID $_CUSTOM_OPTS\
             --max-fps $MAX_FPS \
             --crop $CUSTOM_CROP \
-            --no-display \
+            $NODISPLAY_PARAM \
             --v4l2-sink="/dev/video${DEVICE_NUMBER}" \
             > /dev/null 2>&1
     else
         # Screen on and cropping disabled
         scrcpy --serial $SCRCPY_DEVICE_ID $_CUSTOM_OPTS\
             --max-fps $MAX_FPS \
-            --no-display \
+            $NODISPLAY_PARAM \
             --v4l2-sink="/dev/video${DEVICE_NUMBER}" \
             > /dev/null 2>&1
     fi
