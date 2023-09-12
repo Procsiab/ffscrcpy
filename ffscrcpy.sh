@@ -3,7 +3,7 @@
 # Use your android smartphone as a webcam
 #
 ## Requirements:
-# - scrcpy 1.18 or newewr (Genymobile's original project)
+# - scrcpy 1.18 or newer (Genymobile's original project)
 # - v4l2loopback kernel module
 # - ffmpeg binary
 #
@@ -90,7 +90,7 @@ function _get_phone_battery() {
 function _build_nodisplay_from_scrcpy_version() {
     local _SCRCPY_VERSION=$(scrcpy -v | head -n1 | cut -f 2 -d ' ')
     local _NODISPLAY_PARAM="--no-display"
-    if (( $(echo "$_SCRCPY_VERSION > 2.0" | bc -l) ))
+    if (( $(echo "${_SCRCPY_VERSION::3} > 2.0" | bc -l) ))
     then
         local _NODISPLAY_PARAM="--no-audio-playback"
     fi
