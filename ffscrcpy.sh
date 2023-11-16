@@ -47,11 +47,11 @@ function _turn_screen_off() {
     # unlock and lock again the screen: this prevents the battery from draining
     # because of the opened camera app in the background
     adb -s $DEVICE_SERIAL shell input keyevent POWER
-    sleep 0.2
+    sleep 0.8
     adb -s $DEVICE_SERIAL shell input keyevent POWER
-    sleep 0.2
+    sleep 0.8
     adb -s $DEVICE_SERIAL shell input keyevent POWER
-    sleep 0.2
+    sleep 0.8
     # Moreover, disconnect the ADB server from all devices
     _disconnect_all
 }
