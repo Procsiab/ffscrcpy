@@ -2,22 +2,51 @@
 
 scrcpy + v4l2loopback = 📷
 
+## Changelog
+
+> [!IMPORTANT]  
+> Starting from version 2.2, scrcpy is capable of streaming directly from the 
+camera of your smartphone instead of relying on the screencast workaround I 
+implemented with this script; however, to achieve the same level of details you 
+need to stream at much higher resolution and you also loose all the auto-focus 
+and white balancing features that a camera app offers.
+
+That being said, I do not plan on implementing support for direct camera capture 
+into my script, but I would like the users to be aware of that option, if it 
+suits their use case better; here it is a comparison between a picture taken from 
+the Camera2 API direct streaming, and from the OpenCamera app screencast, from a 
+Xiaomi Mi A1:
+
+<table>
+  <tr>
+     <td>Camera2 API - H265 4000x3000</td>
+     <td>OpenCamera - screencast<br>1920x1080 (default settings)</td>
+  </tr>
+  <tr>
+    <td><img src="img/camera_api.png" width=300></td>
+    <td><img src="img/screencast_opencamera.png" width=300></td>
+  </tr>
+  <tr>
+    <td><pre>scrcpy --v4l2-sink='/dev/video2' \<br>--no-audio --video-source=camera \<br>--video-codec=h265 --camera-id 0 \<br>--camera-ar 4:3</pre></td>
+    <td><pre>./ffscrcpy</pre></td>
+  </tr>
+ </table>
+
 ---
 
-**NEWS**: Since version 2.1, scrcpy does not allow to both turn the screen off and hide displaying the screen capture window, so at the moment I am using a check on the version number to programmatically apply a workaround to still turn off the smartphone's screen.
+**NEWS**: Since version 2.2, scrcpy can stream directly the video feedback from the smartphone's camera, without relying on the screen capture workaround I was using.
 
-**NEWS**: Since version 1.18, scrcpy supports streaming the device display directly to a V4L2 loopback device, so ffmpeg is not needed anymore in this equation - this meas also lower latency and better stability.
+**CHANGE**: Since version 2.1, scrcpy does not allow to both turn the screen off and hide displaying the screen capture window, so at the moment I am using a check on the version number to programmatically apply a workaround to still turn off the smartphone's screen.
 
----
+**CHANGE**: Since version 1.18, scrcpy supports streaming the device display directly to a V4L2 loopback device, so ffmpeg is not needed anymore in this equation - this means also lower latency and better stability.
 
-This script is an automation that combines the two aforementioned tools into a 
+## Features
+
+> [!NOTE]  
+> This script is an automation that combines the two aforementioned tools into a 
 not-totally-stable-but-still-works webcam: you will be able to stream the screen 
 of your Android smartphone to any application that uses a `/dev/video` device as 
 a webcam.
-
-I recommend pairing this script with the [OpenCamera](https://play.google.com/store/apps/details?id=net.sourceforge.opencamera) Android app, which offers complete UI hiding on top of other more "mainstream" features (like face detection). Also, the automatic cropping is hardcoded, based on the black bars from the OpenCamera UI.
-
-### Features
 
 - granular logging level setting
 - streaming over WiFi, using ADB in `tcpip` mode
