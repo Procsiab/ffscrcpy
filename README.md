@@ -34,6 +34,8 @@ Xiaomi Mi A1:
 
 ---
 
+**CHANGE**: Since version 2.5, it's possible again to avoid opening the scrcpy window while keeping the Android device's display off.
+
 **NEWS**: Since version 2.2, scrcpy can stream directly the video feedback from the smartphone's camera, without relying on the screen capture workaround I was using.
 
 **CHANGE**: Since version 2.1, scrcpy does not allow to both turn the screen off and hide displaying the screen capture window, so at the moment I am using a check on the version number to programmatically apply a workaround to still turn off the smartphone's screen.

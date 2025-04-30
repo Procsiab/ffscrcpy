@@ -90,7 +90,10 @@ function _get_phone_battery() {
 function _build_nodisplay_from_scrcpy_version() {
     local _SCRCPY_VERSION=$(scrcpy -v | head -n1 | cut -f 2 -d ' ')
     local _NODISPLAY_PARAM="--no-display"
-    if (( $(echo "${_SCRCPY_VERSION::3} > 2.0" | bc -l) ))
+    if (( $(echo "${_SCRCPY_VERSION::3} > 2.4" | bc -l) ))
+    then
+        local _NODISPLAY_PARAM="--no-window --no-audio-playback"
+    elif (( $(echo "${_SCRCPY_VERSION::3} > 2.0" | bc -l) ))
     then
         local _NODISPLAY_PARAM="--no-audio-playback"
     fi
